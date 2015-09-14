@@ -1,6 +1,7 @@
 import requests
 import os
 
+
 class SocrataConnection(object):
 
     def __init__(self, url, token, limit):

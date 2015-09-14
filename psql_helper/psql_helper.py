@@ -1,5 +1,6 @@
 import psycopg2
 
+
 class PsqlConnection(object):
 
     def __init__(self, db, user, host='localhost'):
