@@ -27,7 +27,8 @@ class FootballdbScraper(object):
         unwanted = set(['@ ', ', ', 'OT', '\n'])
         quotes = '"{0}"'
         with open(file_path, 'w') as f:
-            f.write(','.join([quotes.format(header) for header in headers]))
+            headers = [quotes.format(header) for header in headers.strings]
+            f.write(','.join(headers))
             f.write('\n')
             for row in table:
                 if row.attrs.values()[0][0] != 'header':
@@ -39,5 +40,8 @@ class FootballdbScraper(object):
                         else:
                             if s not in unwanted:
                                 data.append(quotes.format(s))
+                    if len(data) < len(headers):
+                        for i in range(len(headers) - len(data)):
+                            data.append('')
                     f.write(','.join(data))
                     f.write('\n')

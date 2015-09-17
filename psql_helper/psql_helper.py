@@ -6,10 +6,11 @@ Author: Ming Huang
 Last Edit Date: 09/14/2015
 
 The module included is intended to make it easier to quickly to load csv data 
-into Psql and prevent having to write multiple create and insert queries.
+into Psql and prevent having to write multiple create and insert queries, and 
+is a byproduct of the Galvanize Data Science Capstone project.
 
 This is only a first iteration, please feel free to contact me if you see 
-something wrong.
+something wrong.  Error handling has not been included yet.
 '''
 
 import psycopg2
@@ -26,6 +27,13 @@ class PsqlConnection(object):
 
     While this is not conventional database practice, and does make it easier 
     to quickly transition into EDA using SQL for Data Science projects.
+
+    Usage:
+
+    psql = PsqlConnection(db='dbname', user='username')
+    psql.create_table(headers, 'tablename')
+    psql.insert_csv('tablename', 'csvpath')
+    psql.load_csvs_in_directory('folderpath')
     '''
 
     def __init__(self, db, user, host='localhost'):
@@ -106,7 +114,7 @@ class PsqlConnection(object):
         self.conn.commit()
         print 'Table {0} dropped.'.format(table_name)
 
-    def load_all_in_directory(self, directory):
+    def load_csvs_in_directory(self, directory):
         '''
         INPUT:
             directory -> string; directory of files to insert into psql
@@ -116,7 +124,7 @@ class PsqlConnection(object):
          is not in csv or comma delimited format. 
         '''
         for f in os.listdir(directory):
-            if f.endswith(file_type):
+            if f.endswith('.csv'):
                 file_path = '{0}/{1}'.format(directory, f)
                 table_name = re.sub('-| ', '_', f.split('.')[0])
                 headers = self._get_headers(file_path)
@@ -135,7 +143,7 @@ class PsqlConnection(object):
         '''
         with open(file_path) as f:
             headers = f.readline().split(',')
-            headers = [h.strip('\n').strip(' ').strip('"') for h in headers]
+            headers = [re.sub('\n| |"|\.', '', h) for h in headers]
             headers = [re.sub(' |/', '_', h) for h in headers]
             return [re.sub('_+', '_', h) for h in headers]
 
