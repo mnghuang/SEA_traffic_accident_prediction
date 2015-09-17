@@ -1,6 +1,6 @@
-# Creating consolidated views from web scrapes
+-- Creating consolidated views from web scrapes
 
-drop view if exists mariner_scheule;
+drop view if exists mariner_schedule cascade;
 
 create view mariner_schedule as (
 	select 
@@ -45,7 +45,7 @@ create view mariner_schedule as (
 )
 ;
 
-drop view if exists seahawk_schedule;
+drop view if exists seahawk_schedule cascade;
 
 create view seahawk_schedule as (
 	select * from seattle_seahawks_2009
@@ -67,5 +67,29 @@ create view seahawk_schedule as (
 
 	union all
 	select * from seattle_seahawks_2015
+)
+;
+
+drop view if exists mariner_plays cascade;
+
+create view mariner_plays as (
+	select
+		date_box_score::date as event_date
+	from
+		mariner_schedule
+	where
+		opponent like 'vs %'
+)
+;
+
+drop view if exists seahawk_plays cascade;
+
+create view seahawk_plays as (
+	select
+		date::date as event_date
+	from
+		seahawk_schedule
+	where
+		location like '%Seattle, WA%'
 )
 ;
