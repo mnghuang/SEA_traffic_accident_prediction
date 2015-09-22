@@ -3,7 +3,7 @@ drop view if exists zone_latlong;
 create view zone_latlong as (
 	with zone_coords as (
 		select distinct 
-			zone_beat
+			trim(both ' ' from zone_beat) as zone_beat
 			, latitude::float as latitude
 			, longitude::float as longitude
 			, row_number() over (partition by zone_beat

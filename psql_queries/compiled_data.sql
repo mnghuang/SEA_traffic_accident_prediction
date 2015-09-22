@@ -67,7 +67,7 @@ create view compiled_data as (
 		select distinct
 			event_clearance_date::date as event_date
 			, date_part('hour', event_clearance_date::timestamp) as hour
-			, zone_beat
+			, trim(both ' ' from zone_beat) as zone_beat
 		from
 			raw_911_response
 		where
