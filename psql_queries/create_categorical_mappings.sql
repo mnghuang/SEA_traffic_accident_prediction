@@ -3,7 +3,7 @@ drop table if exists zone_beat_id cascade;
 create table zone_beat_id as (
 	with zone_beats as (
 		select distinct
-			zone_beat
+			trim(both ' ' from zone_beat) as zone_beat
 		from 
 			raw_911_response
 		where

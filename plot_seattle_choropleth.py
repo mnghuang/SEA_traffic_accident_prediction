@@ -62,6 +62,7 @@ class PlotSeattleChoropleth(object):
         cbar.ax.tick_params(labelsize=16)
         fig.suptitle(title_name, fontdict={'size':24, 'fontweight':'bold'},
                      y=0.92)
+        plt.show()
 
 
     def _set_basemap(self):

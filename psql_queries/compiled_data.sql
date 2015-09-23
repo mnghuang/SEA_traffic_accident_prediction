@@ -5,6 +5,8 @@ create view compiled_data as (
 		select
 			date::date as event_date
 			, date_part('hour', (date || ' ' ||time)::timestamp) as hour
+			, date_part('dow', date::timestamp) as dow
+			, date_part('month', date::timestamp) as month
 			, conditions
 			, (regexp_matches(dewpoint, '\d+\.\d+'))[1]::float as dewpoint
 			--, case when events like '%Fog%' then 1 else 0 end as fog
@@ -43,6 +45,8 @@ create view compiled_data as (
 		select 
 			event_date
 			, hour
+			, dow
+			, month
 			, conditions
 			, dewpoint
 			--, fog
@@ -71,7 +75,9 @@ create view compiled_data as (
 		from
 			raw_911_response
 		where
-			event_clearance_description = 'MOTOR VEHICLE COLLISION'
+			event_clearance_date != ' '
+			and event_clearance_code in ('430', '460')--'450', '460', '482')
+			and trim(both ' ' from zone_beat) in (select category from zone_beat_id)
 	)
 	, date_hour as (
 		select distinct
@@ -102,6 +108,8 @@ create view compiled_data as (
 	 	, cm.id as condition_id
 	 	, wm.id as winddir_id
 		, db.hour
+		, wd.dow
+		, wd.month
 		, case when mg.event_date is null then 0 else 1 end as mariner_plays
 		, case when sg.event_date is null then 0 else 1 end as seahawk_plays
 		, wd.dewpoint

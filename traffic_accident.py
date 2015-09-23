@@ -5,6 +5,7 @@ import datetime
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 from wunderground_api import wunderground_api as wa
+from plot_seattle_choropleth import PlotSeattleChoropleth
 from collections import defaultdict
 
 
@@ -83,7 +84,7 @@ class TrafficAccidentDataTransformer(object):
 
 class TrafficAccidentModel(object):
 
-    def __init__(self, X, y, cat_features=[0, 12, 14], method='logit'):
+    def __init__(self, X, y, cat_features=[0, 14, 16], method='logit'):
         self.X = X
         self.y = y
         self.cat_features = cat_features
@@ -122,6 +123,9 @@ class TrafficAccidentPipeline(object):
         self.df = pd.read_sql_query(query, con=self.conn)
         self.label_name = label_name
 
+    def get_model_data(self):
+        return self.df
+
     def get_live_data(self):
         api = wa.WundergroundAPI()
         weather = api.get_current_condition()
@@ -152,6 +156,15 @@ class TrafficAccidentPipeline(object):
         elif predict_type == 'booleans':
             result = list(self.get_predictions(df))
         return districts, [x[1] for x in result]
+
+    def plot_current_result(self, predict_type='probabilities'):
+        beats, values = self.get_current_result(predict_type)
+        df = pd.DataFrame({'zone_beat': beats, 'values': values})
+        psc = PlotSeattleChoropleth('data/Precincts/WGS84_3/geo_yutr-ryap-1',
+                                    'Name')
+        psc.fit_data(df)
+        title_name = 'Traffic Accident Probabilities in Seattle Precincts'
+        psc.plot_map(title_name=title_name)
 
     def close(self):
         self.conn.close()
