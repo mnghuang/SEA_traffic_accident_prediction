@@ -4,6 +4,7 @@ import psycopg2
 import datetime
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from wunderground_api import wunderground_api as wa
 from plot_seattle_choropleth import PlotSeattleChoropleth
 from collections import defaultdict
@@ -84,7 +85,8 @@ class TrafficAccidentDataTransformer(object):
 
 class TrafficAccidentModel(object):
 
-    def __init__(self, X, y, cat_features=[0, 14, 16], method='logit'):
+    def __init__(self, X, y, cat_features=[0, 2, 5, 8, 14, 16],
+                 method='logit'):
         self.X = X
         self.y = y
         self.cat_features = cat_features
@@ -100,15 +102,26 @@ class TrafficAccidentModel(object):
     def _build_mutli_downsample_model(self):
         pass
 
-    def _build_isolation_tree(self):
-        pass
+    #def _build_isolation_forest(self):
+    #    pass
+
+    def _build_random_forest(self):
+        self.model = RandomForestClassifier(class_weight='auto',
+                                            n_estimators=100)
+        self.model.fit(self.X, self.y)
 
     def predict(self, X):
-        mat = self.encoder.transform(X)
+        if self.method == 'logit':
+            mat = self.encoder.transform(X)
+        else:
+            mat = X
         return self.model.predict(mat)
 
     def predict_proba(self, X):
-        mat = self.encoder.transform(X)
+        if self.method == 'logit':
+            mat = self.encoder.transform(X)
+        else:
+            mat = X
         return self.model.predict_proba(mat)
 
 
