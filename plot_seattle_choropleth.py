@@ -29,19 +29,21 @@ class PlotSeattleChoropleth(object):
         self.values_col = values_col
 
     def plot_map(self, title_name=None, cmap=plt.get_cmap('Blues'), figwidth=14
-                     , breaks=[0., 0.2, 0.4, 0.6, 0.8, 1.]):
-        self.df_map['bins'] = self.df_map[self.values_col].apply(self._get_breaks, args=(breaks,))
-        bins_labels = ["{0}%".format(100 * x) for x in breaks]
+                     , bins=[0., 0.2, 0.4, 0.6, 0.8, 1.], bin_labels=None):
+        self.df_map['bins'] = self.df_map[self.values_col].apply(self._get_bins, args=(bins,))
+        if bin_labels is None:
+            bin_labels = ["{0}%".format(100 * x) for x in bins]
         fig = plt.figure(figsize=(figwidth, figwidth * self.h / self.w))
         ax = fig.add_subplot(111, axisbg = 'w', frame_on = False)
         func = lambda x: PolygonPatch(x, ec='#111111', lw=.8, alpha=1.,
                                       zorder=4)
         self.df_map['patches'] = self.df_map['poly'].map(func)
         pc = PatchCollection(self.df_map['patches'], match_original=True)
-        cmap_rng = (self.df_map.bins.values - self.df_map.bins.values.min())/ \
-                   (self.df_map.bins.values.max() - float(self.df_map.bins.values.min()))
-
-        cmap_list = [cmap(val) for val in cmap_rng]
+        #cmap_rng = (self.df_map['bins'].values - min(bins)) / float(max(bins))
+        #cmap_rng = (self.df_map['bins'].values - self.df_map['bins'].values.min())/ \
+        #           (self.df_map['bins'].values.max() - float(self.df_map['bins'].values.min()))
+        #cmap_list = [cmap(val) for val in cmap_rng]
+        cmap_list = [cmap(val) for val in self.df_map['bins'].values]
         pc.set_facecolor(cmap_list)
         ax.add_collection(pc)
         self.map.drawmapscale(self.coords[0] + 0.08,
@@ -57,8 +59,8 @@ class PlotSeattleChoropleth(object):
                               fontcolor='#555555',
                               zorder=5,
                               ax=ax)
-        cbar = self._create_colorbar(cmap, ncolors=len(bins_labels) + 1,
-                                     labels=bins_labels, shrink=0.5)
+        cbar = self._create_colorbar(cmap, ncolors=len(bin_labels) + 1,
+                                     labels=bin_labels, shrink=0.5)
         cbar.ax.tick_params(labelsize=16)
         fig.suptitle(title_name, fontdict={'size':24, 'fontweight':'bold'},
                      y=0.92)
@@ -92,11 +94,16 @@ class PlotSeattleChoropleth(object):
 
         self.hood_polygons = prep(MultiPolygon(list(self.df_map['poly'].values)))
 
-    def _get_breaks(self, value, breaks):
-        for i in xrange(len(breaks) - 1):
-            if value > breaks[i] and value <= breaks[i + 1]:
-                return i
-        return -1
+    def _get_bins(self, value, bins):
+        #for i in xrange(len(bins) - 1):
+        #    if value > bins[i] and value <= bins[i + 1]:
+        #        return i
+        #return -1
+        fraction = 1. / (len(bins) - 1)
+        for i in xrange(1, len(bins)):
+            if value > bins[i - 1] and value <= bins[i]:
+                return (i - 1) * fraction
+        return 0
 
     def _create_colorbar(self, cmap, ncolors, labels, **kwargs):    
         norm = BoundaryNorm(range(0, ncolors), cmap.N)

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import psycopg2
 import datetime
+from sklearn.cross_validation import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -49,7 +50,7 @@ class TrafficAccidentDataTransformer(object):
         zones = list(self.mappings[self.zone_table]['id'].values)
         self.data[self.zone_table] = zones
         rows = len(self.data[self.zone_table])
-        self._add_hour(rows)
+        self._add_time(rows)
         self._add_mappings(self.condition_col, self.condition_table, rows)
         self._add_mappings(self.winddir_col, self.winddir_table, rows)
         self._add_sports(self.mariner_table, rows)
@@ -60,8 +61,15 @@ class TrafficAccidentDataTransformer(object):
         zones = list(self.mappings[self.zone_table]['category'].values)
         return pd.DataFrame(self.data).sort(axis=1), zones
 
-    def _add_hour(self, number):
+    def _add_time(self, number):
         self.data['hour'] = [self.time.hour] * number
+        dow = self.time.weekday()
+        if dow == 6:
+            dow = 0
+        else:
+            dow += 1
+        self.data['dow'] = [dow] * number
+        self.data['month'] = [self.time.month] * number
         
     def _add_mappings(self, col, table, number):
         df = self.mappings[table]
@@ -93,22 +101,37 @@ class TrafficAccidentModel(object):
         self.method = method
         if self.method == 'logit':
             self._build_logit_model()
+        elif self.method == 'random_forest':
+            self._build_random_forest()
     
     def _build_logit_model(self):
         self.encoder = OneHotEncoder(categorical_features=self.cat_features)
         mat = self.encoder.fit_transform(self.X)
         self.model = LogisticRegression(class_weight='auto').fit(mat, self.y)
+        #self._create_bins(mat)
 
     def _build_mutli_downsample_model(self):
         pass
 
-    #def _build_isolation_forest(self):
-    #    pass
-
     def _build_random_forest(self):
+        #X_train, X_test, y_train, y_test = train_test_split(self.X, self.y,
+        #                                                    test_size=0.1,
+        #                                                    random_state=2345)
         self.model = RandomForestClassifier(class_weight='auto',
                                             n_estimators=100)
         self.model.fit(self.X, self.y)
+        #self.model.fit(X_train, y_train)
+        #self._create_bins(X_test)
+
+    def _create_bins(self, X, bins=3):
+        proba = pd.Series([x[1] for x in self.model.predict_proba(self.X)])
+        frac = 1. * max(proba) / bins
+        #bins = pd.cut(proba, bins=bins).unique()
+        #bins = [bin.strip('(').strip(']').split(',') for bin in bins]
+        self.bins = [0.] + [i * frac for i in xrange(1, bins)] + [1.]
+
+    def get_bins(self):
+        return self.bins
 
     def predict(self, X):
         if self.method == 'logit':
@@ -131,8 +154,13 @@ class TrafficAccidentPipeline(object):
                  host='localhost'):
         self.conn = psycopg2.connect(dbname=dbname, user=user, host=host)
 
-    def load_model_data(self, table='compiled_data', label_name='label'):
-        query = 'select * from {0};'.format(table)
+    def load_model_data(self, table='compiled_data', label_name='label',
+                        limit=None):
+        if limit is None:
+            limit = ''
+        else:
+            limit = 'limit {0}'.format(limit)
+        query = 'select * from {0} {1};'.format(table, limit)
         self.df = pd.read_sql_query(query, con=self.conn)
         self.label_name = label_name
 
@@ -148,13 +176,14 @@ class TrafficAccidentPipeline(object):
         tadt.transform()
         return tadt.get_data()
 
-    def build_model(self, clear_memory=True):
+    def build_model(self, clear_memory=False):
         df = self.df.copy()
         self.y = df.pop(self.label_name).values
         self.X = df.sort(axis=1).values
         if clear_memory:
             self.df = None
-        self.model = TrafficAccidentModel(self.X, self.y)
+        self.model = TrafficAccidentModel(self.X, self.y,
+                                          method = 'random_forest')
 
     def get_predictions(self, X):
         return self.model.predict(X)
@@ -172,12 +201,16 @@ class TrafficAccidentPipeline(object):
 
     def plot_current_result(self, predict_type='probabilities'):
         beats, values = self.get_current_result(predict_type)
+        #bins = self.model.get_bins()
+        bins = [0., 0.1, 0.3, 0.5]
+        bin_labels = ['Safe', 'Low Risk', 'Medium Risk', 'High Risk']
         df = pd.DataFrame({'zone_beat': beats, 'values': values})
         psc = PlotSeattleChoropleth('data/Precincts/WGS84_3/geo_yutr-ryap-1',
                                     'Name')
         psc.fit_data(df)
         title_name = 'Traffic Accident Probabilities in Seattle Precincts'
-        psc.plot_map(title_name=title_name)
+        psc.plot_map(title_name=title_name, bins=bins, bin_labels=bin_labels)
+        self.psc = psc
 
     def close(self):
         self.conn.close()
