@@ -12,10 +12,8 @@ import imp
 import os
 
 CWD = os.path.dirname(os.path.abspath(__file__))
-WA = imp.load_source('WundergroundAPI',
-                     CWD + '/wunderground_api/wunderground_api.py')
-CHP = imp.load_source('PlotSeattleChoropleth',
-                      CWD + '/plot_seattle_choropleth.py')
+WA = imp.load_source('WundergroundAPI', CWD + '/wunderground_api.py')
+CHP = imp.load_source('PlotSeattleChoropleth', CWD + '/seattle_choropleth.py')
 
 
 class TrafficAccidentDataTransformer(object):
@@ -178,6 +176,7 @@ class TrafficAccidentPipeline(object):
     def get_live_data(self):
         api = WA.WundergroundAPI()
         self.weather = api.get_current_condition()
+        self.update_time = str(datetime.datetime.now())
         tadt = TrafficAccidentDataTransformer(self.conn, self.weather)
         tadt.get_mapping_ids()
         tadt.get_sport_schedules()
