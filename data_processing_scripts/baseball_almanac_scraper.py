@@ -1,6 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
+import imp
+import os
 
+
+CWD = os.path.dirname(os.path.abspath(__file__))
+DOWNLOAD_PATH = CWD + '/../data/{0}_{1}.csv'
 
 class BaseballAlmanacScraper(object):
 
@@ -11,7 +16,7 @@ class BaseballAlmanacScraper(object):
 
     def download_year(self, year, file_path=None):
         if file_path is None:
-            file_path = 'data/{0}_{1}.csv'.format(self.team_city, year)
+            file_path = DOWNLOAD_PATH.format(self.team_city, year)
 
         url = self.url.format(year, self.team_city)
         r = requests.get(url)

@@ -30,11 +30,13 @@ def build_pickle_model():
     pipe = TAP.TrafficAccidentPipeline()
     pipe.load_model_data(limit=1500000)
     pipe.build_model()
+    pipe.build_transformer()
     return pipe
 
 def load_pickle_model():
     pipe = TAP.TrafficAccidentPipeline()
     pipe.load_model()
+    pipe.load_transformer()
     return pipe
 
 def get_pickle_model(command_arg=None):

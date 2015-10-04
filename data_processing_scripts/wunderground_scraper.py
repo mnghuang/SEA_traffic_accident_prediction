@@ -1,20 +1,64 @@
+'''
+A Wunderground Scraper module
+~~~~~~~~~~~~~~~~~~~~
+
+Author: Ming Huang
+Last Edit Date: 09/30/2015
+
+The module included is intended to make it easier to scrape historical weather
+information from wunderground, and is a byproduct of the Galvanize Data Science
+ Capstone project.
+
+This is only a first iteration, please feel free to contact me if you see 
+something wrong.  Error handling has not been included yet.
+'''
+
 import requests
 from bs4 import BeautifulSoup
 import datetime
 from dateutil import parser
 import re
 import pandas as pd
+import imp
+import os
 
+
+CWD = os.path.dirname(os.path.abspath(__file__))
+DOWNLOAD_PATH = CWD + '/../data/weather.csv'
 
 class WundergroundScraper(object):
+    '''
+    Takes a designated Wunderground city key and quickly allows you to download
+     historical weather information between a range of dates.
+
+    Usage:
+
+    wunder = ws.WundergroundScraper()
+    wunder.download_date_range('2009-06-17', '2015-09-29')
+    '''
 
     def __init__(self, city='KBFI'):
+        '''
+        INPUT:
+            city -> string; Wundeground city key
+
+        Initiates the Wunderground scraper class. 
+        '''
         self.city = city
         self.url = 'http://www.wunderground.com/history/airport/'\
                    '{a}/{y}/{m}/{d}/DailyHistory.html'
         self.data = []
 
-    def download_date_range(self, start_dt, end_dt, f_path='data/weather.csv'):
+    def download_date_range(self, start_dt, end_dt, f_path=DOWNLOAD_PATH):
+        '''
+        INPUT:
+            start_dt -> string; start date of scrape
+            end_dt -> string; end date of scrape
+            f_path -> string; path to save scraped data
+
+        For each date in the given date range, scrape and format the historical
+        weather data.  Then save to a csv.
+        '''
         end_dt = parser.parse(end_dt)
         start_dt = parser.parse(start_dt)
         diff = end_dt - start_dt
@@ -28,6 +72,17 @@ class WundergroundScraper(object):
         
 
     def _make_request(self, year, month, day):
+        '''
+        INPUT:
+            year -> int; year of the scrape
+            month -> int; month of the scrape
+            day -> int; day of the scrape
+        OUTPUT:
+            soup object; table content of interest from the scrape
+
+        Make url request and retrieves the html text, the returns the table of 
+        interest.
+        '''
         url = self.url.format(a=self.city, y=year, m=month, d=day)
         r = requests.get(url)
         soup = BeautifulSoup(r.text)
@@ -35,6 +90,14 @@ class WundergroundScraper(object):
         return table[0]
 
     def _get_header(self, table):
+        '''
+        INPUT:
+            table -> soup object; table content of interest from the scrape
+        OUTPUT:
+            list; column name of headers
+
+        Retrieves and returns the headers of the table of interest.
+        '''
         data = ['date']
         for header in table.findAll('th'):
             for h in header.strings:
@@ -43,6 +106,14 @@ class WundergroundScraper(object):
         return data
 
     def _write_data(self, date, table, header):
+        '''
+        INPUT:
+            date -> string; date of table scraped
+            table -> soup object; scraped table of interest
+            header -> list; header of scraped table of interest
+
+        Retrieves and returns the headers of the table of interest.
+        '''
         for row in table.findAll('tr', {'class': 'no-metars'}):
             data = [date]
             for col in row.findAll('td'):

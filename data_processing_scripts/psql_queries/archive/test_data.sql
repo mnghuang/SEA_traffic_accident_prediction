@@ -1,6 +1,6 @@
-drop view if exists compiled_data;
+drop view if exists compiled_data2;
 
-create view compiled_data as (
+create view compiled_data2 as (
 	with weather_transform as (
 		select
 			date::date as event_date
@@ -9,23 +9,10 @@ create view compiled_data as (
 			, date_part('month', date::timestamp) as month
 			, conditions
 			, (regexp_matches(dewpoint, '\d+\.\d+'))[1]::float as dewpoint
-			--, case when events like '%Fog%' then 1 else 0 end as fog
-			--, case when events like '%Rain%' then 1 else 0 end as rain
-			--, case when events like '%Thunderstorm%' then 1 else 0 end as thunderstorm
-			--, case when events like '%Snow%' then 1 else 0 end as snow
-			, case
-				when gustspeed = '-' then 0
-				else (regexp_matches(gustspeed, '\d+\.\d+'))[1]::float
-			end as gustspeed
-			, case
-				when heatindex = '-' or heatindex is null then 0 
-				else (regexp_matches(heatindex, '\d+\.\d+'))[1]::float
-			end as heatindex
+			, case when gustspeed = '-' then 0 else 1 end as have_gustspeed
+			, case when heatindex = '-' or heatindex is null then 0 else 1 end as have_heatindex
 			, (regexp_matches(humidity, '\d+'))[1]::float as humidity
-			, case
-				when precip = 'N/A' then 0
-				else (regexp_matches(precip, '\d+\.\d+'))[1]::float
-			end as precip
+			, case when precip = 'N/A' then 0 else 1 end as have_precip
 			, (regexp_matches(pressure, '\d+\.\d+'))[1]::float as pressure
 			, (regexp_matches(temp, '\d+\.\d+'))[1]::float as temp
 			, (regexp_matches(visibility, '\d+\.\d+'))[1]::float as visibility
@@ -49,35 +36,10 @@ create view compiled_data as (
 			, month
 			, conditions
 			, dewpoint
-			, case 
-				when lag(dewpoint, 12) over (order by event_date, hour) is null
-				then 0
-				else dewpoint - lag(dewpoint, 12) over (order by event_date, hour)
-			end dewpoint_change
-			, gustspeed
-			, case 
-				when lag(gustspeed, 12) over (order by event_date, hour) is null
-				then 0
-				else gustspeed - lag(gustspeed, 12) over (order by event_date, hour)
-			end gustspeed_change
-			, heatindex
-			, case 
-				when lag(heatindex, 12) over (order by event_date, hour) is null
-				then 0
-				else heatindex - lag(heatindex, 12) over (order by event_date, hour)
-			end heatindex_change
+			, have_gustspeed
+			, have_heatindex
 			, humidity
-			, case 
-				when lag(humidity, 12) over (order by event_date, hour) is null
-				then 0
-				else humidity - lag(humidity, 12) over (order by event_date, hour)
-			end humidity_change
-			, precip
-			, case 
-				when lag(precip, 12) over (order by event_date, hour) is null
-				then 0
-				else precip - lag(precip, 12) over (order by event_date, hour)
-			end precip_change
+			, have_precip
 			, pressure
 			, temp
 			, visibility
@@ -89,16 +51,21 @@ create view compiled_data as (
 			row_id = 1
 	)
 	, response_911 as (
-		select distinct
+		select
 			event_clearance_date::date as event_date
 			, date_part('hour', event_clearance_date::timestamp) as hour
 			, trim(both ' ' from zone_beat) as zone_beat
+			, count(*) as number_accidents
 		from
 			raw_911_response
 		where
 			event_clearance_date != ' '
 			and event_clearance_code in ('430', '460')--'450', '460', '482')
 			and trim(both ' ' from zone_beat) in (select category from zone_beat_id)
+		group by
+			event_clearance_date::date
+			, date_part('hour', event_clearance_date::timestamp)
+			, trim(both ' ' from zone_beat)
 	)
 	, date_hour as (
 		select distinct
@@ -109,40 +76,56 @@ create view compiled_data as (
 	)
 	, beats as (
 		select distinct
-			zone_beat
+			trim(both ' ' from zone_beat) as zone_beat
+			, hundred_block_location
 		from
-			response_911
+			raw_911_response
+		where
+			event_clearance_date != ' '
+			and event_clearance_code in ('430', '460')--'450', '460', '482')
+			and trim(both ' ' from zone_beat) in (select category from zone_beat_id)
+	)
+	, new_beats as (
+		select
+			zone_beat
+			, sum(case when hundred_block_location like '%/%' then 1 else 0 end) as intersections
+		from
+			beats
+		group by 
+			zone_beat
 	)
 	, date_beats as (
 		select
 			dh.event_date
 			, dh.hour
 			, b.zone_beat
+			, b.intersections
 		from
 			date_hour as dh
 			join
-			beats as b
+			new_beats as b
 				on 1 = 1
 	)
 	select
 	 	zbm.id as zone_beat_id
 	 	, cm.id as condition_id
 	 	, wm.id as winddir_id
+	 	, db.intersections
 		, db.hour
 		, wd.dow
 		, wd.month
 		, case when mg.event_date is null then 0 else 1 end as mariner_plays
 		, case when sg.event_date is null then 0 else 1 end as seahawk_plays
 		, wd.dewpoint
-		, wd.gustspeed
-		, wd.heatindex
+		, wd.have_gustspeed
+		, wd.have_heatindex
 		, wd.humidity
-		, wd.precip
+		, wd.have_precip
 		, wd.pressure
 		, wd.temp
 		, wd.visibility
 		, wd.windspeed
-		, case when rsp.event_date is null then 0 else 1 end as label
+		, case when rsp.event_date is not null then 1 else 0 end as label
 	from
 		date_beats as db
 		left outer join
@@ -169,5 +152,7 @@ create view compiled_data as (
 		left outer join
 		winddir_id as wm
 			on wd.winddir = wm.category
+	where
+		db.event_date > '2014-12-31'
 )
 ;

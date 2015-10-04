@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 FIELD_MAPPING = {'conditions': 'weather', 
 				 'winddir': 'wind_dir', 
 				 'dewpoint': 'dewpoint_f', 
-				 'gustpeed': 'wind_gust_mph',
+				 'gustspeed': 'wind_gust_mph',
 				 'heatindex': 'heat_index_f',
 				 'humidity': 'relative_humidity',
 				 'precip': 'precip_1hr_in',

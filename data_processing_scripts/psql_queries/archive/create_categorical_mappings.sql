@@ -9,34 +9,11 @@ create table zone_beat_id as (
 		where
 			event_clearance_description = 'MOTOR VEHICLE COLLISION'
 	)
-	, beats as (
-		select distinct
-			trim(both ' ' from zone_beat) as zone_beat
-			, hundred_block_location
-		from
-			raw_911_response
-		where
-			event_clearance_date != ' '
-			and event_clearance_code in ('430', '460')
-	)
-	, new_beats as (
-		select
-			zone_beat
-			, sum(case when hundred_block_location like '%/%' then 1 else 0 end) as intersections
-		from
-			beats
-		group by 
-			zone_beat
-	)
 	select
-		zb.zone_beat as category
-		, row_number() over (order by zb.zone_beat) as id
-		, nb.intersections
+		zone_beat as category
+		, row_number() over (order by zone_beat) as id
 	from
-		zone_beats as zb
-		left join
-		new_beats as nb
-			on zb.zone_beat = nb.zone_beat
+		zone_beats
 )
 ;
 

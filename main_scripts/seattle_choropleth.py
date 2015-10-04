@@ -9,6 +9,7 @@ from shapely.geometry import Point, Polygon, MultiPoint, MultiPolygon
 from shapely.prepared import prep
 import fiona
 from descartes import PolygonPatch
+import matplotlib.colors as mcolors
 
 
 class PlotSeattleChoropleth(object):
@@ -22,15 +23,35 @@ class PlotSeattleChoropleth(object):
         self._set_basemap()
         self._set_mapdata()
 
+    def _set_colormap(self):
+        c = mcolors.ColorConverter().to_rgb
+        return self._make_colormap([c('greenyellow'), c('yellow'), 0.33,
+                                    c('yellow'), c('orange'), 0.66,
+                                    c('orange'), c('red')])
+
+    def _make_colormap(self, seq):
+        seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
+        cdict = {'red': [], 'green': [], 'blue': []}
+        for i, item in enumerate(seq):
+            if isinstance(item, float):
+                r1, g1, b1 = seq[i - 1]
+                r2, g2, b2 = seq[i + 1]
+                cdict['red'].append([item, r1, r2])
+                cdict['green'].append([item, g1, g2])
+                cdict['blue'].append([item, b1, b2])
+        return mcolors.LinearSegmentedColormap('CustomMap', cdict)
+
     def fit_data(self, data_df, beat_col='zone_beat', values_col='values'):
         self.df_map = self.df_map.merge(data_df, left_on='name',
                                         right_on=beat_col)
         self.df_map = self.df_map.drop(beat_col, axis=1)
         self.values_col = values_col
 
-    def plot_map(self, title_name, cmap=plt.get_cmap('Blues'), figwidth=14,
-                 bins=[0., 0.2, 0.4, 0.6, 0.8, 1.], bin_labels=None,
-                 save_path=None):
+    def plot_map(self, title_name, cmap=None, figwidth=14,
+                 bins=[0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.],
+                 bin_labels=None, save_path=None):
+        if cmap is None:
+            cmap = self._set_colormap()
         self.df_map['bins'] = self.df_map[self.values_col].apply(self._get_bins, args=(bins,))
         if bin_labels is None:
             bin_labels = ["{0}%".format(100 * x) for x in bins]
@@ -44,7 +65,7 @@ class PlotSeattleChoropleth(object):
         #cmap_rng = (self.df_map['bins'].values - self.df_map['bins'].values.min())/ \
         #           (self.df_map['bins'].values.max() - float(self.df_map['bins'].values.min()))
         #cmap_list = [cmap(val) for val in cmap_rng]
-        cmap_list = [cmap(val) for val in self.df_map['bins'].values]
+        cmap_list = [cmap(val) for val in self.df_map[self.values_col].values]
         pc.set_facecolor(cmap_list)
         ax.add_collection(pc)
         self.map.drawmapscale(self.coords[0] + 0.08,
